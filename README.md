@@ -107,7 +107,7 @@ You can also utilize thread consistency with the host to construct LLM reasoning
 There are many sandboxed implementations of Python. Below are some simple tests conducted in my local environment for reference only.
 
 | Tech    | Initialize latency | Execution Time | Language completeness | Security | File mounting | Snapshotting |
-|---------|--------------------|----------------|   ----------------    |----------| -------- | -------- |
+|---------|--------------------|----------------|----------------------|----------| -------- | -------- |
 | Monty   |0.057ms             |0.033ms         | partial   |   strict | easy | easy |
 | PyBox   |200.926ms (first-time load)<br>14.319ms (PyBox() after first-time)<br>7.911ms (init context only) |0.066ms         | almost | strict | easy | working on |
 | Pyodide |4567.486ms (mcp-run-python)          |2135.502ms | full | poor | easy | hard |
