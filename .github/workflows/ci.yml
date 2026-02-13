@@ -1,0 +1,59 @@
+# act --pull=false --reuse
+name: CI
+on:
+  push:
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+jobs:
+  build-and-tests:
+    strategy:
+      fail-fast: false # 即使其中一个系统失败，其他系统也继续运行
+      matrix:
+        os: [ubuntu-latest]
+    
+    # 2. 引用当前矩阵中的操作系统
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clone Repo
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-wasip1
+      
+      # use rust cache
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      # run cargo test
+      - name: Rust test
+        run: cargo test -- --nocapture
+      
+      # build pybox.wasm
+      - name: Build pybox.wasm
+        run: python3 build_wasm.py
+      
+      # install pybox python package
+      - name: Install python package
+        run: pip3 install . --break-system-packages
+
+      # install pipreqs
+      - name: Install pipreqs
+        run: pip3 install pipreqs --break-system-packages
+
+      - name: Install test deps
+        run: |
+          pipreqs --mode no-pin --encoding=utf-8 --force tests/
+          pip3 install -r tests/requirements.txt --break-system-packages
+
+      # run all python tests
+      - name: Run python tests
+        run: |
+          for file in tests/*.py; do
+            echo "Running $file..."
+            python3 "$file"
+          done

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pybox"
+version = "0.0.2"
+description = "In-process sandboxed-python base on RustPython and WASM"
+authors = [
+    {name = "s0duku", email = "njfu.s0duku@gmail.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.12"
+
+[tool.maturin]
+include = ["python/pybox/**/*"]
+# 指定 pybox-python 的 Cargo.toml 位置
+manifest-path = "crates/pybox-python/Cargo.toml"
+python-source = "python"
+module-name = "pybox.pyboxcore"
+
+ 

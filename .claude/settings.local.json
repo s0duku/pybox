@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo build:*)",
+      "Bash(pip install:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(Select-String -Pattern \"error\" -Context 1,2)",
+      "Bash(Select-Object -First 10)",
+      "Bash(cargo test:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(cargo search:*)",
+      "Bash(python -c \"import os; os.remove\\(''c:/Users/linux/projects/agents-a6f8a5c8a5/build.py''\\)\")",
+      "Bash(cargo check:*)",
+      "Bash(PYO3_PYTHON=/c/Users/linux/AppData/Local/Programs/Python/Python312/python cargo check:*)",
+      "Bash(git checkout:*)",
+      "Bash(PYO3_PYTHON=/c/Users/linux/AppData/Local/Programs/Python/Python312/python.exe cargo build:*)",
+      "Bash(timeout 10 python:*)"
+    ]
+  }
+}

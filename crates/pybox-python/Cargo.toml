@@ -1,0 +1,19 @@
+[package]
+name = "pybox-python"
+version = {workspace = true}
+edition = {workspace = true}
+rust-version = {workspace = true}
+license = {workspace = true}
+authors = {workspace = true}
+description = {workspace = true}
+
+[lib]
+name = "pyboxcore"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { workspace = true }
+wasmtime.workspace = true
+wasmtime-wasi.workspace = true
+anyhow.workspace = true
+dashmap.workspace = true

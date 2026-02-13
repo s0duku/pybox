@@ -1,0 +1,50 @@
+[workspace]
+resolver = "2"
+members = ["crates/pybox-reactor", "crates/pybox-python"]
+
+[workspace.package]
+version = "0.0.2"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT"
+authors = ["s0duku <njfu.s0duku@gmail.com>"]
+description = "In-process sandboxed-python base on RustPython and WASM"
+
+
+[workspace.dependencies]
+libc = "0.2.181"
+wasmtime = { version = "28.0.0" }
+wasmtime-wasi = { version = "28.0.0" }
+anyhow = "1.0"
+dashmap = "6.1"
+pyo3 = { version = "0.28.0", features = ["extension-module"] }
+
+[workspace.dependencies.rustpython-vm]
+git = "https://github.com/RustPython/RustPython"
+rev = "a49ab1911ccde895206c3abc7d9f9dbe9fb357fd"
+default-features = false
+features = [
+    "freeze-stdlib",
+    "compiler",
+    "parser",
+    "stdio",
+    "encodings",
+]
+
+[workspace.dependencies.rustpython-pylib]
+git = "https://github.com/RustPython/RustPython"
+rev = "a49ab1911ccde895206c3abc7d9f9dbe9fb357fd"
+default-features = false
+features = [
+    "freeze-stdlib"
+]
+
+# 优化编译速度
+[profile.dev]
+opt-level = 0
+debug = false  # 减少调试信息以加快编译
+
+[profile.release]
+opt-level = 3
+lto = false  # 关闭 LTO 以加快编译（可以手动启用以减小体积）
+codegen-units = 16  # 增加并行编译单元
