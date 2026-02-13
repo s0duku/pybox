@@ -14,13 +14,12 @@ type WasmSize = u32;
 /// WASM ioctl handle ID
 type HandleId = u32;
 
-
 /// WASM 端的 pybox_bytes 结构（仅用于文档）
 #[allow(dead_code)]
 #[repr(C, packed)]
 pub struct PyboxBytes {
     pub length: WasmSize,
-    pub data: [u8; 0]
+    pub data: [u8; 0],
 }
 
 /// WASM 端的 ioctl packet 结构
@@ -134,7 +133,6 @@ static DEFAULT_ENGINE: std::sync::LazyLock<Arc<wasmtime::Engine>> =
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyBytesMethods};
 
-
 #[pyclass]
 #[derive(Default)]
 pub struct PyBoxReactorCore {
@@ -142,15 +140,14 @@ pub struct PyBoxReactorCore {
     alloc_mem: std::sync::OnceLock<wasmtime::TypedFunc<WasmSize, WasmPtr>>,
     free_mem: std::sync::OnceLock<wasmtime::TypedFunc<WasmPtr, ()>>,
     init_local: std::sync::OnceLock<wasmtime::TypedFunc<WasmPtr, i32>>,
-    init_local_from:std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr), i32>>,
+    init_local_from: std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr), i32>>,
     del_local: std::sync::OnceLock<wasmtime::TypedFunc<WasmPtr, i32>>,
-    assign:std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr, WasmPtr, WasmPtr), i32>>,
-    protect:std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr), i32>>,
-    exec:std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr, WasmPtr, WasmPtr), i32>>,
+    assign: std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr, WasmPtr, WasmPtr), i32>>,
+    protect: std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr), i32>>,
+    exec: std::sync::OnceLock<wasmtime::TypedFunc<(WasmPtr, WasmPtr, WasmPtr, WasmPtr), i32>>,
     memory: std::sync::OnceLock<wasmtime::Memory>,
     instance: std::sync::OnceLock<wasmtime::Instance>,
 }
-
 
 impl PyBoxReactorCore {
     /// 注册一个 Python handler
@@ -199,35 +196,31 @@ impl PyBoxReactorCore {
         }
 
         // 获取并设置 allocator 和其他函数
-        if let (Ok(alloc),
-                Ok(free),
-                Ok(init_local),
-                Ok(init_local_from),
-                Ok(del_local),
-                Ok(protect),
-                Ok(assign),
-                Ok(exec),
-            ) = (
+        if let (
+            Ok(alloc),
+            Ok(free),
+            Ok(init_local),
+            Ok(init_local_from),
+            Ok(del_local),
+            Ok(protect),
+            Ok(assign),
+            Ok(exec),
+        ) = (
             instance.get_typed_func::<WasmSize, WasmPtr>(&mut *store, "pybox_alloc_mem"),
             instance.get_typed_func::<WasmPtr, ()>(&mut *store, "pybox_free_mem"),
             instance.get_typed_func::<WasmPtr, i32>(&mut *store, "pybox_init_local"),
-            instance.get_typed_func::<(WasmPtr, WasmPtr), i32>(
-                &mut *store,
-                "pybox_init_local_from",
-            ),
+            instance
+                .get_typed_func::<(WasmPtr, WasmPtr), i32>(&mut *store, "pybox_init_local_from"),
             instance.get_typed_func::<WasmPtr, i32>(&mut *store, "pybox_del_local"),
-            instance.get_typed_func::<(WasmPtr, WasmPtr), i32>(
+            instance.get_typed_func::<(WasmPtr, WasmPtr), i32>(&mut *store, "pybox_local_protect"),
+            instance.get_typed_func::<(WasmPtr, WasmPtr, WasmPtr, WasmPtr), i32>(
                 &mut *store,
-                "pybox_local_protect",
+                "pybox_assign",
             ),
             instance.get_typed_func::<(WasmPtr, WasmPtr, WasmPtr, WasmPtr), i32>(
                 &mut *store,
-                "pybox_assign"
+                "pybox_exec",
             ),
-            instance.get_typed_func::<(WasmPtr, WasmPtr, WasmPtr, WasmPtr), i32>(
-                &mut *store,
-                "pybox_exec"
-            )
         ) {
             let _ = self.alloc_mem.set(alloc);
             let _ = self.free_mem.set(free);
@@ -262,8 +255,6 @@ impl PyBoxReactorCore {
     fn get_instance(&self) -> Option<&wasmtime::Instance> {
         self.instance.get()
     }
-
-
 
     // 从 WASM 内存读取字节 (泛型版本，支持 AsContext)
     fn read_memory_bytes(
@@ -343,7 +334,12 @@ impl PyBoxReactorCore {
 
         // 读取 pybox_bytes 的 length 字段
         let length_bytes = self.read_memory_bytes(&ctx, ptr, 4)?;
-        let length = u32::from_le_bytes([length_bytes[0], length_bytes[1], length_bytes[2], length_bytes[3]]);
+        let length = u32::from_le_bytes([
+            length_bytes[0],
+            length_bytes[1],
+            length_bytes[2],
+            length_bytes[3],
+        ]);
 
         if length == 0 {
             return Ok(Some(Vec::new()));
@@ -384,7 +380,9 @@ impl PyBoxReactorCore {
         if end > memory_data.len() {
             return Err(format!(
                 "Memory access out of bounds: {}..{} > {}",
-                start, end, memory_data.len()
+                start,
+                end,
+                memory_data.len()
             ));
         }
 
@@ -448,10 +446,7 @@ impl PyBoxReactorCore {
         }
 
         // 1. 计算总大小（每个 pybox_bytes = 4 字节 length + 数据长度）
-        let total_size: u32 = data_slices
-            .iter()
-            .map(|d| 4 + d.len() as u32)
-            .sum();
+        let total_size: u32 = data_slices.iter().map(|d| 4 + d.len() as u32).sum();
 
         // 2. 一次性分配整块内存
         let base_ptr = self.allocate_buffer(&mut ctx, total_size)?;
@@ -510,7 +505,8 @@ impl PyBoxReactorCore {
             };
 
             // ========== 优化：零拷贝读取请求数据 ==========
-            let req_data = match self.read_memory_slice(&caller, req_packet.buf, req_packet.buf_len) {
+            let req_data = match self.read_memory_slice(&caller, req_packet.buf, req_packet.buf_len)
+            {
                 Ok(data) => data,
                 Err(e) => {
                     eprintln!("Failed to read request data: {}", e);
@@ -593,23 +589,27 @@ pub struct PyBoxReactor {
 unsafe impl Sync for PyBoxReactor {}
 
 impl PyBoxReactor {
-
     /// 线程安全访问
-    pub fn safe_access<F,R>(&self,f:F) -> pyo3::PyResult<R>
-    where F: FnOnce() -> pyo3::PyResult<R> {
-        
+    pub fn safe_access<F, R>(&self, f: F) -> pyo3::PyResult<R>
+    where
+        F: FnOnce() -> pyo3::PyResult<R>,
+    {
         let tid: u64 = unsafe { std::mem::transmute(thread::current().id()) };
         // 1. 尝试加锁
-        let (is_initial, success) = match self.owner_thread_raw.compare_exchange(
-            0, tid, Ordering::SeqCst, Ordering::SeqCst
-        ) {
-            Ok(_) => (true, true),      // 成功从 0 变 tid：初始调用
-            Err(id) if id == tid => (false, true), // 已经是 tid：重入调用
-            _ => (false, false),        // 已经是别人的 id：冲突
-        };
+        let (is_initial, success) =
+            match self
+                .owner_thread_raw
+                .compare_exchange(0, tid, Ordering::SeqCst, Ordering::SeqCst)
+            {
+                Ok(_) => (true, true),                 // 成功从 0 变 tid：初始调用
+                Err(id) if id == tid => (false, true), // 已经是 tid：重入调用
+                _ => (false, false),                   // 已经是别人的 id：冲突
+            };
 
         if !success {
-            return Err(pyo3::exceptions::PyRuntimeError::new_err("PyboxReactor using by another thread!"));
+            return Err(pyo3::exceptions::PyRuntimeError::new_err(
+                "PyboxReactor using by another thread!",
+            ));
         }
 
         let result = f();
@@ -627,7 +627,10 @@ impl PyBoxReactor {
 impl PyBoxReactor {
     #[new]
     #[pyo3(signature = (*_args, **_kwargs))]
-    fn new(_args: &Bound<'_, pyo3::types::PyTuple>, _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>) -> Self {
+    fn new(
+        _args: &Bound<'_, pyo3::types::PyTuple>,
+        _kwargs: Option<&Bound<'_, pyo3::types::PyDict>>,
+    ) -> Self {
         Self {
             core: None,
             store: None,
@@ -691,9 +694,9 @@ impl PyBoxReactor {
                       req_ptr: WasmPtr,
                       resp_ptr: WasmPtr|
                       -> Result<i32, wasmtime::Error> {
-                    core_clone.handle_ioctl_request(caller, handle, req_ptr, resp_ptr).map_err(
-                        |e| {wasmtime::Error::from(e)}
-                    )
+                    core_clone
+                        .handle_ioctl_request(caller, handle, req_ptr, resp_ptr)
+                        .map_err(|e| wasmtime::Error::from(e))
                 },
             )
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
@@ -731,8 +734,7 @@ impl PyBoxReactor {
     ///     handle: Handler ID
     ///     func: Python callable that accepts bytes and returns bytes
     fn register_handler(&self, handle: HandleId, func: Py<PyAny>) -> pyo3::PyResult<()> {
-        self.safe_access(|| 
-        {
+        self.safe_access(|| {
             let core = self.core.as_ref().ok_or_else(|| {
                 pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
             })?;
@@ -749,17 +751,14 @@ impl PyBoxReactor {
     /// Returns:
     ///     bool: True if handler was found and removed, False otherwise
     fn unregister_handler(&self, handle: HandleId) -> pyo3::PyResult<bool> {
-        self.safe_access(|| 
-            {
-                let core = self.core.as_ref().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
-                })?;
-                Ok(core.unregister_handler(handle))
-            }
-        )
+        self.safe_access(|| {
+            let core = self.core.as_ref().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+            })?;
+            Ok(core.unregister_handler(handle))
+        })
     }
-    
-    
+
     /// Initialize a new local environment
     ///
     /// Args:
@@ -768,43 +767,46 @@ impl PyBoxReactor {
     /// Returns:
     ///     bool: True if successful, False otherwise
     fn init_local(&self, env_id: &str) -> pyo3::PyResult<bool> {
-        self.safe_access(||
-            {
-                let core = self.core.as_ref().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+        self.safe_access(|| {
+            let core = self.core.as_ref().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+            })?;
+
+            // 从 UnsafeCell 获取可变指针
+            let store_ptr = self
+                .store
+                .as_ref()
+                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
+                .get();
+            let store = unsafe { &mut *store_ptr };
+
+            let pybox_init_local_func = core.init_local.get().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_init_local")
+            })?;
+
+            // ========== 优化：批量分配（虽然只有一个参数，但保持一致性）==========
+            let (base_ptr, ptrs) = core
+                .allocate_pybox_bytes_batch(&mut *store, &[env_id.as_bytes()])
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+            let env_id_ptr = ptrs[0];
+
+            // 调用 WASM 函数
+            let result = pybox_init_local_func
+                .call(&mut *store, env_id_ptr)
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "pybox_init_local failed: {}",
+                        e
+                    ))
                 })?;
 
-                // 从 UnsafeCell 获取可变指针
-                let store_ptr = self.store.as_ref()
-                    .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
-                    .get();
-                let store = unsafe { &mut *store_ptr };
+            // 清理
+            core.free_buffer(&mut *store, base_ptr)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
 
-                let pybox_init_local_func = core.init_local.get().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_init_local")
-                })?;
-
-                // ========== 优化：批量分配（虽然只有一个参数，但保持一致性）==========
-                let (base_ptr, ptrs) = core
-                    .allocate_pybox_bytes_batch(&mut *store, &[env_id.as_bytes()])
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                let env_id_ptr = ptrs[0];
-
-                // 调用 WASM 函数
-                let result = pybox_init_local_func
-                    .call(&mut *store, env_id_ptr)
-                    .map_err(|e| {
-                        pyo3::exceptions::PyRuntimeError::new_err(format!("pybox_init_local failed: {}", e))
-                    })?;
-
-                // 清理
-                core.free_buffer(&mut *store, base_ptr)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                Ok(result == 0)
-            }
-        )
+            Ok(result == 0)
+        })
     }
 
     /// Initialize a new local environment from an existing one
@@ -816,50 +818,52 @@ impl PyBoxReactor {
     /// Returns:
     ///     bool: True if successful, False otherwise
     fn init_local_from(&self, env_id: &str, from_env_id: &str) -> pyo3::PyResult<bool> {
-        self.safe_access(||
-            {
-                let core = self.core.as_ref().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+        self.safe_access(|| {
+            let core = self.core.as_ref().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+            })?;
+
+            // 从 UnsafeCell 获取可变指针
+            let store_ptr = self
+                .store
+                .as_ref()
+                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
+                .get();
+            let store = unsafe { &mut *store_ptr };
+
+            let pybox_init_local_from_func = core.init_local_from.get().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_init_local_from")
+            })?;
+
+            // ========== 优化：批量分配两个参数 ==========
+            let (base_ptr, ptrs) = core
+                .allocate_pybox_bytes_batch(
+                    &mut *store,
+                    &[env_id.as_bytes(), from_env_id.as_bytes()],
+                )
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+            let (env_id_ptr, from_env_id_ptr) = (ptrs[0], ptrs[1]);
+
+            // 调用 WASM 函数
+            let result = pybox_init_local_from_func
+                .call(&mut *store, (env_id_ptr, from_env_id_ptr))
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "pybox_init_local_from failed: {}",
+                        e
+                    ))
                 })?;
 
-                // 从 UnsafeCell 获取可变指针
-                let store_ptr = self.store.as_ref()
-                    .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
-                    .get();
-                let store = unsafe { &mut *store_ptr };
+            // ========== 优化：批量释放（一次调用）==========
+            core.free_buffer(&mut *store, base_ptr)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
 
-                let pybox_init_local_from_func = core.init_local_from.get().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_init_local_from")
-                })?;
-
-                // ========== 优化：批量分配两个参数 ==========
-                let (base_ptr, ptrs) = core
-                    .allocate_pybox_bytes_batch(&mut *store, &[env_id.as_bytes(), from_env_id.as_bytes()])
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                let (env_id_ptr, from_env_id_ptr) = (ptrs[0], ptrs[1]);
-
-                // 调用 WASM 函数
-                let result = pybox_init_local_from_func
-                    .call(&mut *store, (env_id_ptr, from_env_id_ptr))
-                    .map_err(|e| {
-                        pyo3::exceptions::PyRuntimeError::new_err(format!(
-                            "pybox_init_local_from failed: {}",
-                            e
-                        ))
-                    })?;
-
-                // ========== 优化：批量释放（一次调用）==========
-                core.free_buffer(&mut *store, base_ptr)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                Ok(result == 0)
-            }
-        )
+            Ok(result == 0)
+        })
     }
 
-
-        /// Delete a local environment
+    /// Delete a local environment
     ///
     /// Args:
     ///     env_id: Environment ID to delete
@@ -867,46 +871,47 @@ impl PyBoxReactor {
     /// Returns:
     ///     bool: True if successful, False otherwise
     fn del_local(&self, env_id: &str) -> pyo3::PyResult<bool> {
-        self.safe_access(|| 
-            {
-                let core = self.core.as_ref().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+        self.safe_access(|| {
+            let core = self.core.as_ref().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+            })?;
+
+            // 从 UnsafeCell 获取可变指针
+            let store_ptr = self
+                .store
+                .as_ref()
+                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
+                .get();
+            let store = unsafe { &mut *store_ptr };
+
+            let pybox_del_local_func = core.del_local.get().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_del_local")
+            })?;
+
+            // ========== 优化：批量分配（虽然只有一个参数，但保持一致性）==========
+            let (base_ptr, ptrs) = core
+                .allocate_pybox_bytes_batch(&mut *store, &[env_id.as_bytes()])
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+            let env_id_ptr = ptrs[0];
+
+            // 调用 WASM 函数
+            let result = pybox_del_local_func
+                .call(&mut *store, env_id_ptr)
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "pybox_del_local failed: {}",
+                        e
+                    ))
                 })?;
 
-                // 从 UnsafeCell 获取可变指针
-                let store_ptr = self.store.as_ref()
-                    .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
-                    .get();
-                let store = unsafe { &mut *store_ptr };
+            // 清理
+            core.free_buffer(&mut *store, base_ptr)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
 
-                let pybox_del_local_func = core.del_local.get().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_del_local")
-                })?;
-
-                // ========== 优化：批量分配（虽然只有一个参数，但保持一致性）==========
-                let (base_ptr, ptrs) = core
-                    .allocate_pybox_bytes_batch(&mut *store, &[env_id.as_bytes()])
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                let env_id_ptr = ptrs[0];
-
-                // 调用 WASM 函数
-                let result = pybox_del_local_func
-                    .call(&mut *store, env_id_ptr)
-                    .map_err(|e| {
-                        pyo3::exceptions::PyRuntimeError::new_err(format!("pybox_del_local failed: {}", e))
-                    })?;
-
-                // 清理
-                core.free_buffer(&mut *store, base_ptr)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                Ok(result == 0)
-            }
-        )
+            Ok(result == 0)
+        })
     }
-
-
 
     /// Assign a value to a variable in an environment
     ///
@@ -921,90 +926,89 @@ impl PyBoxReactor {
         name: &str,
         value: &Bound<'_, PyAny>,
     ) -> pyo3::PyResult<()> {
-        self.safe_access(||
-            {
-                let core = self.core.as_ref().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+        self.safe_access(|| {
+            let core = self.core.as_ref().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+            })?;
+
+            // 从 UnsafeCell 获取可变指针
+            let store_ptr = self
+                .store
+                .as_ref()
+                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
+                .get();
+            let store = unsafe { &mut *store_ptr };
+
+            let pybox_assign_func = core.assign.get().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_assign")
+            })?;
+
+            // 将 value 序列化为 JSON
+            let json_module = py.import("json")?;
+            let json_str: String = json_module.getattr("dumps")?.call1((value,))?.extract()?;
+
+            // ========== 优化：批量分配所有参数 ==========
+            let (base_ptr, ptrs) = core
+                .allocate_pybox_bytes_batch(
+                    &mut *store,
+                    &[
+                        env_id.as_bytes(),
+                        name.as_bytes(),
+                        json_str.as_bytes(),
+                        &[0u8; 4], // error_ptr_ptr (初始化为 NULL)
+                    ],
+                )
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+            let (env_id_ptr, name_ptr, json_ptr, error_ptr_ptr) =
+                (ptrs[0], ptrs[1], ptrs[2], ptrs[3]);
+
+            // 调用 WASM 函数
+            let result = pybox_assign_func
+                .call(&mut *store, (env_id_ptr, name_ptr, json_ptr, error_ptr_ptr))
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!("pybox_assign failed: {}", e))
                 })?;
 
-                // 从 UnsafeCell 获取可变指针
-                let store_ptr = self.store.as_ref()
-                    .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
-                    .get();
-                let store = unsafe { &mut *store_ptr };
-
-                let pybox_assign_func = core.assign.get().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_assign")
-                })?;
-
-                // 将 value 序列化为 JSON
-                let json_module = py.import("json")?;
-                let json_str: String = json_module.getattr("dumps")?.call1((value,))?.extract()?;
-
-                // ========== 优化：批量分配所有参数 ==========
-                let (base_ptr, ptrs) = core
-                    .allocate_pybox_bytes_batch(
-                        &mut *store,
-                        &[
-                            env_id.as_bytes(),
-                            name.as_bytes(),
-                            json_str.as_bytes(),
-                            &[0u8; 4], // error_ptr_ptr (初始化为 NULL)
-                        ],
-                    )
+            // ========== 优化：零拷贝读取错误信息 ==========
+            let error_msg = {
+                let error_data = core
+                    .read_pybox_bytes_ptr_data(&*store, error_ptr_ptr)
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
 
-                let (env_id_ptr, name_ptr, json_ptr, error_ptr_ptr) = (ptrs[0], ptrs[1], ptrs[2], ptrs[3]);
+                let error_str = String::from_utf8_lossy(error_data).to_string();
 
-                // 调用 WASM 函数
-                let result = pybox_assign_func
-                    .call(&mut *store, (env_id_ptr, name_ptr, json_ptr, error_ptr_ptr))
-                    .map_err(|e| {
-                        pyo3::exceptions::PyRuntimeError::new_err(format!("pybox_assign failed: {}", e))
-                    })?;
-
-                // ========== 优化：零拷贝读取错误信息 ==========
-                let error_msg = {
-                    let error_data = core
-                        .read_pybox_bytes_ptr_data(&*store, error_ptr_ptr)
-                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                    let error_str = String::from_utf8_lossy(error_data).to_string();
-
-                    // 释放 WASM 端分配的错误缓冲区
-                    let error_ptr = core
-                        .read_u32(&*store, error_ptr_ptr)
-                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-                    if error_ptr != 0 {
-                        core.free_buffer(&mut *store, error_ptr)
-                            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-                    }
-
-                    error_str
-                };
-
-                // ========== 优化：批量释放参数（一次调用）==========
-                core.free_buffer(&mut *store, base_ptr)
+                // 释放 WASM 端分配的错误缓冲区
+                let error_ptr = core
+                    .read_u32(&*store, error_ptr_ptr)
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                // 检查结果
-                if result != 0 {
-                    return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                        "PyBox assign failed: {}",
-                        if !error_msg.is_empty() {
-                            error_msg
-                        } else {
-                            "Unknown error".to_string()
-                        }
-                    )));
+                if error_ptr != 0 {
+                    core.free_buffer(&mut *store, error_ptr)
+                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
                 }
 
-                Ok(())
-            }
-        )
-    }
+                error_str
+            };
 
-    
+            // ========== 优化：批量释放参数（一次调用）==========
+            core.free_buffer(&mut *store, base_ptr)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+            // 检查结果
+            if result != 0 {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "PyBox assign failed: {}",
+                    if !error_msg.is_empty() {
+                        error_msg
+                    } else {
+                        "Unknown error".to_string()
+                    }
+                )));
+            }
+
+            Ok(())
+        })
+    }
 
     /// Execute Python code in a sandboxed environment
     ///
@@ -1016,181 +1020,178 @@ impl PyBoxReactor {
     ///     str: Output from the execution (stdout + stderr)
     #[pyo3(signature = (code, env_id=None))]
     fn exec(&self, code: &str, env_id: Option<&str>) -> pyo3::PyResult<String> {
-        self.safe_access(|| 
-            {
-                let core = self.core.as_ref().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
-                })?;
-                // 从 UnsafeCell 获取可变指针
-                let store_ptr = self.store.as_ref()
-                    .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
-                    .get();
+        self.safe_access(|| {
+            let core = self.core.as_ref().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+            })?;
+            // 从 UnsafeCell 获取可变指针
+            let store_ptr = self
+                .store
+                .as_ref()
+                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
+                .get();
 
-                // 通过 unsafe 创建可变引用
-                let store = unsafe { &mut *store_ptr };
+            // 通过 unsafe 创建可变引用
+            let store = unsafe { &mut *store_ptr };
 
+            let pybox_exec_func = core.exec.get().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_exec")
+            })?;
 
-                let pybox_exec_func = core.exec.get().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_exec")
-                })?;
+            // ========== 优化：批量分配所有参数 ==========
+            // 准备输入数据切片
+            let mut input_slices = Vec::with_capacity(4);
+            let env_id_index = if let Some(env_id) = env_id {
+                input_slices.push(env_id.as_bytes());
+                Some(input_slices.len() - 1)
+            } else {
+                None
+            };
+            input_slices.push(code.as_bytes()); // code
+            input_slices.push(&[0u8; 4]); // output_ptr_ptr (初始化为 NULL)
+            input_slices.push(&[0u8; 4]); // error_ptr_ptr (初始化为 NULL)
 
-                // ========== 优化：批量分配所有参数 ==========
-                // 准备输入数据切片
-                let mut input_slices = Vec::with_capacity(4);
-                let env_id_index = if let Some(env_id) = env_id {
-                    input_slices.push(env_id.as_bytes());
-                    Some(input_slices.len() - 1)
-                } else {
-                    None
-                };
-                input_slices.push(code.as_bytes()); // code
-                input_slices.push(&[0u8; 4]); // output_ptr_ptr (初始化为 NULL)
-                input_slices.push(&[0u8; 4]); // error_ptr_ptr (初始化为 NULL)
+            // 一次性分配所有内存！
+            let (base_ptr, ptrs) = core
+                .allocate_pybox_bytes_batch(&mut *store, &input_slices)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
 
-                // 一次性分配所有内存！
-                let (base_ptr, ptrs) = core
-                    .allocate_pybox_bytes_batch(&mut *store, &input_slices)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                // 解析各个指针
-                let (env_id_ptr, code_ptr, output_ptr_ptr, error_ptr_ptr) = if let Some(idx) = env_id_index {
+            // 解析各个指针
+            let (env_id_ptr, code_ptr, output_ptr_ptr, error_ptr_ptr) =
+                if let Some(idx) = env_id_index {
                     (ptrs[idx], ptrs[idx + 1], ptrs[idx + 2], ptrs[idx + 3])
                 } else {
                     (0, ptrs[0], ptrs[1], ptrs[2])
                 };
 
-                // ========== 调用 WASM 函数 ==========
-                let result = pybox_exec_func
-                    .call(&mut *store, (env_id_ptr, code_ptr, output_ptr_ptr, error_ptr_ptr))
-                    .map_err(|e| match e.downcast::<PyErr>() {
-                        Ok(err) => err,
-                        Err(err) => pyo3::exceptions::PyRuntimeError::new_err(format!(
-                            "Wasmtime runtime error: {}",
-                            err
-                        )),
-                    })?;
+            // ========== 调用 WASM 函数 ==========
+            let result = pybox_exec_func
+                .call(
+                    &mut *store,
+                    (env_id_ptr, code_ptr, output_ptr_ptr, error_ptr_ptr),
+                )
+                .map_err(|e| match e.downcast::<PyErr>() {
+                    Ok(err) => err,
+                    Err(err) => pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "Wasmtime runtime error: {}",
+                        err
+                    )),
+                })?;
 
-                // ========== 优化：零拷贝读取输出 ==========
-                let output = {
-                    let output_data = core
-                        .read_pybox_bytes_ptr_data(&*store, output_ptr_ptr)
-                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                    // 从切片引用直接转 String（这里的拷贝是必需的）
-                    let output_str = String::from_utf8_lossy(output_data).to_string();
-
-                    // 释放 WASM 端分配的输出缓冲区
-                    let output_ptr = core
-                        .read_u32(&*store, output_ptr_ptr)
-                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-                    if output_ptr != 0 {
-                        core.free_buffer(&mut *store, output_ptr)
-                            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-                    }
-
-                    output_str
-                };
-
-                // ========== 优化：零拷贝读取错误 ==========
-                let error = {
-                    let error_data = core
-                        .read_pybox_bytes_ptr_data(&*store, error_ptr_ptr)
-                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                    let error_str = String::from_utf8_lossy(error_data).to_string();
-
-                    // 释放 WASM 端分配的错误缓冲区
-                    let error_ptr = core
-                        .read_u32(&*store, error_ptr_ptr)
-                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-                    if error_ptr != 0 {
-                        core.free_buffer(&mut *store, error_ptr)
-                            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-                    }
-
-                    error_str
-                };
-
-                // ========== 优化：批量释放参数（一次调用）==========
-                core.free_buffer(&mut *store, base_ptr)
+            // ========== 优化：零拷贝读取输出 ==========
+            let output = {
+                let output_data = core
+                    .read_pybox_bytes_ptr_data(&*store, output_ptr_ptr)
                     .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
 
-                // 检查结果
-                if result != 0 {
-                    return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                        "PyBox exec failed: {}",
-                        if !error.is_empty() {
-                            error
-                        } else {
-                            "Unknown error".to_string()
-                        }
-                    )));
+                // 从切片引用直接转 String（这里的拷贝是必需的）
+                let output_str = String::from_utf8_lossy(output_data).to_string();
+
+                // 释放 WASM 端分配的输出缓冲区
+                let output_ptr = core
+                    .read_u32(&*store, output_ptr_ptr)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+                if output_ptr != 0 {
+                    core.free_buffer(&mut *store, output_ptr)
+                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
                 }
 
-                Ok(output)
-            }
-        )
+                output_str
+            };
 
+            // ========== 优化：零拷贝读取错误 ==========
+            let error = {
+                let error_data = core
+                    .read_pybox_bytes_ptr_data(&*store, error_ptr_ptr)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+                let error_str = String::from_utf8_lossy(error_data).to_string();
+
+                // 释放 WASM 端分配的错误缓冲区
+                let error_ptr = core
+                    .read_u32(&*store, error_ptr_ptr)
+                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+                if error_ptr != 0 {
+                    core.free_buffer(&mut *store, error_ptr)
+                        .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+                }
+
+                error_str
+            };
+
+            // ========== 优化：批量释放参数（一次调用）==========
+            core.free_buffer(&mut *store, base_ptr)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+            // 检查结果
+            if result != 0 {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "PyBox exec failed: {}",
+                    if !error.is_empty() {
+                        error
+                    } else {
+                        "Unknown error".to_string()
+                    }
+                )));
+            }
+
+            Ok(output)
+        })
     }
 
-    
-
-    
     /// Protect a variable in an environment (make it read-only from Python code)
     ///
     /// Args:
     ///     env_id: Environment ID
     ///     name: Variable name to protect
     fn protect(&self, env_id: &str, name: &str) -> pyo3::PyResult<()> {
-        self.safe_access(||
-            {
-                let core = self.core.as_ref().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+        self.safe_access(|| {
+            let core = self.core.as_ref().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("PyBoxReactor not initialized")
+            })?;
+
+            // 从 UnsafeCell 获取可变指针
+            let store_ptr = self
+                .store
+                .as_ref()
+                .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
+                .get();
+            let store = unsafe { &mut *store_ptr };
+
+            let pybox_local_protect_func = core.protect.get().ok_or_else(|| {
+                pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_protect")
+            })?;
+
+            // ========== 优化：批量分配两个参数 ==========
+            let (base_ptr, ptrs) = core
+                .allocate_pybox_bytes_batch(&mut *store, &[env_id.as_bytes(), name.as_bytes()])
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
+
+            let (env_id_ptr, name_ptr) = (ptrs[0], ptrs[1]);
+
+            // 调用 WASM 函数
+            let result = pybox_local_protect_func
+                .call(&mut *store, (env_id_ptr, name_ptr))
+                .map_err(|e| {
+                    pyo3::exceptions::PyRuntimeError::new_err(format!(
+                        "pybox_local_protect failed: {}",
+                        e
+                    ))
                 })?;
 
-                // 从 UnsafeCell 获取可变指针
-                let store_ptr = self.store.as_ref()
-                    .ok_or_else(|| pyo3::exceptions::PyRuntimeError::new_err("Store not initialized"))?
-                    .get();
-                let store = unsafe { &mut *store_ptr };
+            // ========== 优化：批量释放（一次调用）==========
+            core.free_buffer(&mut *store, base_ptr)
+                .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
 
-                let pybox_local_protect_func = core.protect.get().ok_or_else(|| {
-                    pyo3::exceptions::PyRuntimeError::new_err("Failed to get pybox_protect")
-                })?;
-
-                // ========== 优化：批量分配两个参数 ==========
-                let (base_ptr, ptrs) = core
-                    .allocate_pybox_bytes_batch(&mut *store, &[env_id.as_bytes(), name.as_bytes()])
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                let (env_id_ptr, name_ptr) = (ptrs[0], ptrs[1]);
-
-                // 调用 WASM 函数
-                let result = pybox_local_protect_func
-                    .call(&mut *store, (env_id_ptr, name_ptr))
-                    .map_err(|e| {
-                        pyo3::exceptions::PyRuntimeError::new_err(format!(
-                            "pybox_local_protect failed: {}",
-                            e
-                        ))
-                    })?;
-
-                // ========== 优化：批量释放（一次调用）==========
-                core.free_buffer(&mut *store, base_ptr)
-                    .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e))?;
-
-                // 检查结果
-                if result != 0 {
-                    return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
-                        "Failed to protect variable '{}' in environment '{}'",
-                        name, env_id
-                    )));
-                }
-
-                Ok(())
+            // 检查结果
+            if result != 0 {
+                return Err(pyo3::exceptions::PyRuntimeError::new_err(format!(
+                    "Failed to protect variable '{}' in environment '{}'",
+                    name, env_id
+                )));
             }
-        )
+
+            Ok(())
+        })
     }
-
-
 }

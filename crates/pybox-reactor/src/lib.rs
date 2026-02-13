@@ -6,7 +6,7 @@ mod mem;
 mod protected;
 mod sanitizer;
 
-use libc::{ssize_t};
+use libc::ssize_t;
 
 use rustpython_vm::{Interpreter, PyObjectRef, pymodule};
 
@@ -81,11 +81,9 @@ pub fn pybox_new_interpreter() -> Rc<Interpreter> {
 /// init one local execution enviroment in pybox
 /// * `id` for
 #[unsafe(no_mangle)]
-pub extern "C" fn pybox_init_local(id:*const ioctl::pybox_bytes) -> ssize_t {
+pub extern "C" fn pybox_init_local(id: *const ioctl::pybox_bytes) -> ssize_t {
     PYBOX_STATE.with_borrow_mut(|pybox_state| {
-        let Ok(id) = (unsafe {
-            (*id).string()
-        })else {
+        let Ok(id) = (unsafe { (*id).string() }) else {
             return -1;
         };
 
@@ -124,7 +122,6 @@ pub extern "C" fn pybox_init_local_from(
     from_id: *const ioctl::pybox_bytes,
 ) -> ssize_t {
     PYBOX_STATE.with_borrow_mut(|pybox_state| {
-        
         let Ok((id, from_id)) = (|| -> Result<_, ()> {
             unsafe {
                 let id = (*id).string()?;
@@ -197,11 +194,7 @@ pub extern "C" fn pybox_init_local_from(
 #[unsafe(no_mangle)]
 pub extern "C" fn pybox_del_local(id: *const pybox_bytes) -> ssize_t {
     PYBOX_STATE.with_borrow_mut(|pybox_state| {
-        let Ok(id) = (
-            unsafe {
-                (*id).string()
-            }
-        ) else {
+        let Ok(id) = (unsafe { (*id).string() }) else {
             return -1;
         };
 
@@ -389,24 +382,15 @@ mod lib_tests {
         assert_eq!(result, 0, "Failed to create source local");
 
         let new_id = pybox_bytes::new_bytes(b"copied_local");
-        let result = pybox_init_local_from(
-            new_id,
-            from_id
-        );
+        let result = pybox_init_local_from(new_id, from_id);
         assert_eq!(result, 0, "Failed to copy local");
 
-        let result = pybox_init_local_from(
-            new_id,
-            from_id,
-        );
+        let result = pybox_init_local_from(new_id, from_id);
         assert_eq!(result, -1, "Should fail when target already exists");
 
         let nonexistent = pybox_bytes::new_bytes(b"nonexistent");
         let another_id = pybox_bytes::new_bytes(b"another_local");
-        let result = pybox_init_local_from(
-            another_id,
-            nonexistent,
-        );
+        let result = pybox_init_local_from(another_id, nonexistent);
         assert_eq!(result, -1, "Should fail when source doesn't exist");
     }
 }

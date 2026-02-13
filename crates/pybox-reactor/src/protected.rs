@@ -1,6 +1,6 @@
 //! protected.rs for supporting protected locals
 
-use libc::{ssize_t};
+use libc::ssize_t;
 
 use rustpython_vm::{
     AsObject, Py, PyObject, PyObjectRef, PyResult, VirtualMachine,
@@ -293,7 +293,7 @@ mod test {
         let name = ioctl::pybox_bytes::new_bytes(b"my_var");
         let result = pybox_init_local(id);
         assert_eq!(result, 0);
-        let result = pybox_local_protect(id,name);
+        let result = pybox_local_protect(id, name);
         assert_eq!(result, 0);
     }
 }

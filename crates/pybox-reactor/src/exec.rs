@@ -1,17 +1,15 @@
 //! exec crate 提供 pybox_exec 等在 locals 中执行代码的接口
 
-
 use std::rc::Rc;
 
-use libc::{ssize_t};
+use libc::ssize_t;
 
 use rustpython_vm::{AsObject, Interpreter, PyResult, VirtualMachine, compiler::Mode};
 
-use super::{PYBOX_STATE};
+use super::PYBOX_STATE;
 
 use crate::ioctl;
 use crate::protected::ProtectedLocals;
-
 
 /// 在指定 id 的 locals 环境上创建一个 json 描述的变量
 ///
@@ -30,9 +28,8 @@ pub extern "C" fn pybox_assign(
     unsafe {
         if id.is_null() || name.is_null() || object.is_null() {
             if !error.is_null() {
-                *error = ioctl::pybox_bytes::new_bytes(
-                    b"Invalid arguments: id, name or object is null"
-                );
+                *error =
+                    ioctl::pybox_bytes::new_bytes(b"Invalid arguments: id, name or object is null");
             }
             return -1;
         }
@@ -50,7 +47,7 @@ pub extern "C" fn pybox_assign(
             if !error.is_null() {
                 unsafe {
                     *error = ioctl::pybox_bytes::new_bytes(
-                        b"Invalid UTF-8 encoding in id, name or object"
+                        b"Invalid UTF-8 encoding in id, name or object",
                     );
                 }
             }
@@ -61,9 +58,7 @@ pub extern "C" fn pybox_assign(
             let error_msg = format!("Local context '{}' not found", id);
             if !error.is_null() {
                 unsafe {
-                    *error = ioctl::pybox_bytes::new_bytes(
-                        error_msg.as_bytes()
-                    );
+                    *error = ioctl::pybox_bytes::new_bytes(error_msg.as_bytes());
                 }
             }
             return -1;
@@ -106,9 +101,7 @@ pub extern "C" fn pybox_assign(
                     }
                     if !error.is_null() {
                         unsafe {
-                            *error = ioctl::pybox_bytes::new_bytes(
-                                error_string.as_bytes()
-                            );
+                            *error = ioctl::pybox_bytes::new_bytes(error_string.as_bytes());
                         }
                     }
                     -1
@@ -174,17 +167,13 @@ where
 pub extern "C" fn pybox_exec(
     id: *const ioctl::pybox_bytes,
     code: *const ioctl::pybox_bytes,
-    output:*mut *mut ioctl::pybox_bytes,
-    error:*mut *mut ioctl::pybox_bytes,
+    output: *mut *mut ioctl::pybox_bytes,
+    error: *mut *mut ioctl::pybox_bytes,
 ) -> ssize_t {
-
-
     if id.is_null() || code.is_null() {
         if !error.is_null() {
-            unsafe  {
-                *error = ioctl::pybox_bytes::new_bytes(
-                    b"Invalid arguments: id or code is null"
-                );
+            unsafe {
+                *error = ioctl::pybox_bytes::new_bytes(b"Invalid arguments: id or code is null");
             }
         }
         return -1;
@@ -199,10 +188,8 @@ pub extern "C" fn pybox_exec(
         }
     })() else {
         if !error.is_null() {
-            unsafe  {
-                *error = ioctl::pybox_bytes::new_bytes(
-                    b"Invalid UTF-8 encoding in id or code",
-                );
+            unsafe {
+                *error = ioctl::pybox_bytes::new_bytes(b"Invalid UTF-8 encoding in id or code");
             }
         }
         return -1;
@@ -223,10 +210,8 @@ pub extern "C" fn pybox_exec(
         Ok(values) => values,
         Err(err_msg) => {
             if !error.is_null() {
-                unsafe  {
-                    *error = ioctl::pybox_bytes::new_bytes(
-                        err_msg.as_bytes(),
-                    );
+                unsafe {
+                    *error = ioctl::pybox_bytes::new_bytes(err_msg.as_bytes());
                 }
             }
             return -1;
@@ -250,10 +235,8 @@ pub extern "C" fn pybox_exec(
                     }
                 }
                 if !output.is_null() {
-                    unsafe  {
-                        *output = ioctl::pybox_bytes::new_bytes(
-                            output_string.as_bytes(),
-                        );
+                    unsafe {
+                        *output = ioctl::pybox_bytes::new_bytes(output_string.as_bytes());
                     }
                 }
                 return 0;
@@ -287,10 +270,8 @@ pub extern "C" fn pybox_exec(
 
         // write output to buffer
         if !output.is_null() {
-            unsafe  {
-                *output = ioctl::pybox_bytes::new_bytes(
-                    output_string.as_bytes(),
-                );
+            unsafe {
+                *output = ioctl::pybox_bytes::new_bytes(output_string.as_bytes());
             }
         }
         0
@@ -312,13 +293,16 @@ mod test {
         let result = pybox_init_local(id);
         assert_eq!(result, 0);
 
-        let code = ioctl::pybox_bytes::new_bytes(r#"
+        let code = ioctl::pybox_bytes::new_bytes(
+            r#"
 import _io
 print("_io module contents:")
 print(dir(_io))
 print("\nChecking for FileIO:")
 print(hasattr(_io, 'FileIO'))
-"#.as_bytes());
+"#
+            .as_bytes(),
+        );
 
         let output_buf = pybox_alloc_mem(std::mem::size_of::<*mut ioctl::pybox_bytes>());
         let result = pybox_exec(
@@ -332,8 +316,9 @@ print(hasattr(_io, 'FileIO'))
         unsafe {
             println!(
                 "{}",
-                (*(*(output_buf as *mut *mut ioctl::pybox_bytes))).string()
-                .unwrap()
+                (*(*(output_buf as *mut *mut ioctl::pybox_bytes)))
+                    .string()
+                    .unwrap()
             );
         }
     }
@@ -345,10 +330,11 @@ print(hasattr(_io, 'FileIO'))
         assert_eq!(result, 0);
 
         let name = ioctl::pybox_bytes::new_bytes(b"my_var");
-        let result = pybox_local_protect(id,name);
+        let result = pybox_local_protect(id, name);
         assert_eq!(result, 0);
 
-        let code =ioctl::pybox_bytes::new_bytes(r#"
+        let code = ioctl::pybox_bytes::new_bytes(
+            r#"
 import pybox
 
 print(pybox)
@@ -366,7 +352,9 @@ test_continue = "continued!"
 print("Test 1: Assignment to my_var")
 my_var = 10
 print(f"After assignment, my_var = {my_var}")
-                        "#.as_bytes());
+                        "#
+            .as_bytes(),
+        );
 
         let output_buf = pybox_alloc_mem(std::mem::size_of::<*mut ioctl::pybox_bytes>());
 
@@ -382,14 +370,18 @@ print(f"After assignment, my_var = {my_var}")
         unsafe {
             println!(
                 "{}",
-                (*(*(output_buf as *mut *mut ioctl::pybox_bytes))).string()
-                .unwrap()
+                (*(*(output_buf as *mut *mut ioctl::pybox_bytes)))
+                    .string()
+                    .unwrap()
             );
         }
 
-        let code = ioctl::pybox_bytes::new_bytes(r#"
+        let code = ioctl::pybox_bytes::new_bytes(
+            r#"
 print(test_continue)
-                        "#.as_bytes());
+                        "#
+            .as_bytes(),
+        );
 
         let result = pybox_exec(
             id,
@@ -404,8 +396,9 @@ print(test_continue)
         unsafe {
             println!(
                 "{}",
-                (*(*(output_buf as *mut *mut ioctl::pybox_bytes))).string()
-                .unwrap()
+                (*(*(output_buf as *mut *mut ioctl::pybox_bytes)))
+                    .string()
+                    .unwrap()
             );
         }
     }
@@ -418,32 +411,19 @@ print(test_continue)
 
         // Protect a variable
         let protected_var = ioctl::pybox_bytes::new_bytes(b"protected_var");
-        let result = pybox_local_protect(
-            id,
-            protected_var
-        );
+        let result = pybox_local_protect(id, protected_var);
         assert_eq!(result, 0, "Failed to protect variable");
 
         // Test 1: Assign a simple value to a non-protected variable
         let var_name = ioctl::pybox_bytes::new_bytes(b"test_var");
         let json_value = ioctl::pybox_bytes::new_bytes(b"42");
 
-        let result = pybox_assign(
-            id,
-            var_name,
-            json_value,
-            std::ptr::null_mut(),
-        );
+        let result = pybox_assign(id, var_name, json_value, std::ptr::null_mut());
         assert_eq!(result, 0, "Failed to assign simple value");
 
         // Test 2: Assign to protected variable (should succeed since pybox_assign bypasses protection)
         let json_value2 = ioctl::pybox_bytes::new_bytes(b"\"bypassed!\"");
-        let result = pybox_assign(
-            id,
-            protected_var,
-            json_value2,
-            std::ptr::null_mut()
-        );
+        let result = pybox_assign(id, protected_var, json_value2, std::ptr::null_mut());
         assert_eq!(
             result, 0,
             "Failed to assign to protected variable (should bypass protection)"
@@ -451,36 +431,37 @@ print(test_continue)
 
         // Test 3: Assign a complex object
         let complex_var = ioctl::pybox_bytes::new_bytes(b"complex_obj");
-        let json_complex = ioctl::pybox_bytes::new_bytes(br#"{"key": "value", "number": 123, "array": [1, 2, 3]}"#);
-        let result = pybox_assign(
-            id,
-            complex_var,
-            json_complex,
-            std::ptr::null_mut()
+        let json_complex = ioctl::pybox_bytes::new_bytes(
+            br#"{"key": "value", "number": 123, "array": [1, 2, 3]}"#,
         );
+        let result = pybox_assign(id, complex_var, json_complex, std::ptr::null_mut());
         assert_eq!(result, 0, "Failed to assign complex object");
 
         // Test 4: Verify the assignments by executing code
-        let code = ioctl::pybox_bytes::new_bytes(r#"
+        let code = ioctl::pybox_bytes::new_bytes(
+            r#"
 print(f"test_var = {test_var}")
 print(f"protected_var = {protected_var}")
 print(f"complex_obj = {complex_obj}")
-"#.as_bytes());
+"#
+            .as_bytes(),
+        );
 
         let output_buf = pybox_alloc_mem(std::mem::size_of::<*mut ioctl::pybox_bytes>());
         let result = pybox_exec(
             id,
             code,
             output_buf as *mut *mut ioctl::pybox_bytes,
-            std::ptr::null_mut()
+            std::ptr::null_mut(),
         );
 
         println!("\n=================================================================");
         println!("Test pybox_assign output:");
         assert_eq!(result, 0, "Execution failed");
         unsafe {
-            let output = (*(*(output_buf as *mut *mut ioctl::pybox_bytes))).string()
-            .unwrap();
+            let output = (*(*(output_buf as *mut *mut ioctl::pybox_bytes)))
+                .string()
+                .unwrap();
             println!("{}", output);
             assert!(output.contains("test_var = 42"), "test_var should be 42");
             assert!(
