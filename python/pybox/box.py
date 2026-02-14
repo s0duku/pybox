@@ -86,5 +86,7 @@ class PyBox(PyBoxReactor):
 
 
 __all__ = [
+    PyBoxHandler.__name__,
+    PyBoxJSONRPCHandler.__name__,
     PyBox.__name__
 ]

@@ -109,7 +109,7 @@ There are many sandboxed implementations of Python. Below are some simple tests 
 | Tech    | Initialize latency | Execution Time | Language completeness | Security | File mounting | Snapshotting |
 |---------|--------------------|----------------|----------------------|----------| -------- | -------- |
 | Monty   |0.057ms             |0.033ms         | partial   |   strict | easy | easy |
-| PyBox   |<ul><li>First load: 200.926ms</li><li>Instance creation: 14.319ms</li><li>Context init: 7.911ms</li></ul> |0.066ms         | almost | strict | easy | working on |
+| PyBox   |<ul><li>First load: 200.926ms</li><li>Instance creation: 14.319ms</li><li>Context init: 7.911ms</li></ul> |0.066ms         | almost | strict | easy | easy |
 | Pyodide |4567.486ms (mcp-run-python)          |2135.502ms | full | poor | easy | hard |
 | Docker  |525.731ms           |/               | full | good | easy | intermediate |
 

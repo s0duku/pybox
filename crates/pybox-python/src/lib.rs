@@ -8,7 +8,6 @@ use pyo3::prelude::*;
 fn pyboxcore(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<reactor::PyBoxReactor>()?;
     m.add_class::<reactor::PyBoxReactorCore>()?;
-    m.add_class::<reactor_snapshot::PyBoxReactorSnapshotCheckpoint>()?;
     m.add_class::<reactor_snapshot::PyBoxReactorSnapshot>()?;
     Ok(())
 }

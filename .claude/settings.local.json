@@ -18,7 +18,8 @@
       "Bash(PYO3_PYTHON=/c/Users/linux/AppData/Local/Programs/Python/Python312/python cargo check:*)",
       "Bash(git checkout:*)",
       "Bash(PYO3_PYTHON=/c/Users/linux/AppData/Local/Programs/Python/Python312/python.exe cargo build:*)",
-      "Bash(timeout 10 python:*)"
+      "Bash(timeout 10 python:*)",
+      "WebFetch(domain:docs.wasmtime.dev)"
     ]
   }
 }

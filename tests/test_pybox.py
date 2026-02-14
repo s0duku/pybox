@@ -3,6 +3,7 @@ import os
 import threading
 from pybox.exception import PyboxException
 from pybox.box import PyBox
+from pybox.snapshot import PyBoxSnapshot
 
 def new_pybox(preopen_dirs={}):
     box = PyBox(preopen_dirs)
@@ -58,6 +59,7 @@ def test_reentrant():
         @box.tool
         def hello(name):
             nonlocal id,box
+            box.init_local_from("new",id)
             return box.exec(f"print('Hello {name}')",id)
         
         box.exec(hello.stub(),id)
@@ -102,7 +104,14 @@ print(os.listdir('/'))
 
 
 
-
+def test_snapshot():
+    id,box = new_pybox()
+    box.exec("x = 100", id)
+    snapshot = PyBoxSnapshot(box)
+    box.exec("x = 999", "main")
+    assert 'x = 999' in box.exec("print(f'x = {x}')", id)
+    snapshot.restore(box)
+    assert 'x = 100' in box.exec("print(f'x = {x}')", id)
     
 
 
