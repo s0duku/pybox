@@ -1064,18 +1064,43 @@ impl PyBoxReactor {
                     (0, ptrs[0], ptrs[1], ptrs[2])
                 };
 
-            // ========== 调用 WASM 函数 ==========
+            // ========== 调用 WASM 函数（异常时恢复所有 mutable globals） ==========
+            // 先 collect 释放 exports() 的 &mut store 借用，再逐个读值
+            let exported_globals: Vec<wasmtime::Global> = core
+                .instance
+                .get()
+                .map(|inst| {
+                    inst.exports(&mut *store)
+                        .filter_map(|exp| exp.into_global())
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let mut saved_globals: Vec<(wasmtime::Global, wasmtime::Val)> = Vec::new();
+            for g in exported_globals {
+                if g.ty(&*store).mutability() == wasmtime::Mutability::Var {
+                    let val = g.get(&mut *store);
+                    saved_globals.push((g, val));
+                }
+            }
+
             let result = pybox_exec_func
                 .call(
                     &mut *store,
                     (env_id_ptr, code_ptr, output_ptr_ptr, error_ptr_ptr),
                 )
-                .map_err(|e| match e.downcast::<PyErr>() {
-                    Ok(err) => err,
-                    Err(err) => pyo3::exceptions::PyRuntimeError::new_err(format!(
-                        "Wasmtime runtime error: {}",
-                        err
-                    )),
+                .map_err(|e| {
+                    // 调用失败时恢复所有 mutable globals，防止状态泄漏
+                    for (g, val) in &saved_globals {
+                        let _ = g.set(&mut *store, val.clone());
+                    }
+                    match e.downcast::<PyErr>() {
+                        Ok(err) => err,
+                        Err(err) => pyo3::exceptions::PyRuntimeError::new_err(format!(
+                            "Wasmtime runtime error: {}",
+                            err
+                        )),
+                    }
                 })?;
 
             // ========== 优化：零拷贝读取输出 ==========

@@ -8,3 +8,9 @@ jobs = 8  # 根据你的 CPU 核心数调整
 [target.x86_64-pc-windows-msvc]
 # 可选：使用更快的链接器
 # linker = "rust-lld.exe"
+
+[target.wasm32-wasip1]
+rustflags = ["-C", "link-arg=--export=__stack_pointer"]
+
+[target.wasm32-wasi]
+rustflags = ["-C", "link-arg=--export=__stack_pointer"]
